@@ -1,81 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-  <script src="https://unpkg.com/@glideapps/glide-custom-component-sdk@latest/dist/index.js"></script>
   <style>
     body, html { margin: 0; padding: 0; height: 100vh; background: #000; color: white; overflow: hidden; font-family: sans-serif; }
-    #wrapper { display: flex; flex-direction: column; height: 100vh; }
-    #toolbar { flex: 0 0 100px; display: flex; overflow-x: auto; background: #111; padding: 10px; gap: 10px; border-bottom: 1px solid #333; }
-    .item { flex: 0 0 70px; height: 80px; background: #222; border-radius: 8px; padding: 5px; text-align: center; cursor: pointer; border: 1px solid #444; }
-    .item img { width: 40px; height: 40px; object-fit: contain; background: white; border-radius: 4px; }
-    .item span { font-size: 8px; display: block; margin-top: 4px; color: #999; }
-    #canvas-cont { flex: 1; background: #050505; position: relative; }
-    .btns { padding: 10px; display: flex; gap: 10px; background: #111; }
-    button { flex: 1; padding: 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
-    .del { background: #422; color: #f66; }
-    .sav { background: #bb86fc; color: #000; }
+    #toolbar { display: flex; overflow-x: auto; background: #111; padding: 10px; gap: 10px; height: 110px; border-bottom: 1px solid #333; }
+    .item { flex: 0 0 80px; height: 90px; background: #222; border-radius: 8px; text-align: center; cursor: pointer; border: 1px solid #444; padding: 5px; }
+    .item img { width: 45px; height: 45px; object-fit: contain; background: white; border-radius: 4px; display: block; margin: 0 auto 5px; }
+    #canvas-wrap { height: calc(100vh - 180px); background: #050505; position: relative; }
+    .btns { display: flex; padding: 10px; gap: 10px; background: #111; position: fixed; bottom: 0; width: 100%; box-sizing: border-box; }
+    button { flex: 1; padding: 15px; border-radius: 8px; border: none; font-weight: bold; }
+    .del { background: #422; color: #f66; } .sav { background: #bb86fc; color: #000; }
   </style>
 </head>
 <body>
-  <div id="wrapper">
-    <div id="toolbar"></div>
-    <div id="canvas-cont"><canvas id="c"></canvas></div>
-    <div class="btns">
-      <button class="del" onclick="del()">Smazat</button>
-      <button class="sav" onclick="sav()">Stáhnout PNG</button>
-    </div>
+  <div id="toolbar"></div>
+  <div id="canvas-wrap"><canvas id="c"></canvas></div>
+  <div class="btns">
+    <button class="del" onclick="del()">Smazat</button>
+    <button class="sav" onclick="sav()">Uložit PNG</button>
   </div>
-
   <script>
     const canvas = new fabric.Canvas('c');
+    const urlParams = new URLSearchParams(window.location.search);
+    // Data budeme brát z URL adresy
+    const dataRaw = urlParams.get('data'); 
     
-    // SDK propojení s Glide
-    window.glide.onParamsChange((params) => {
-      const data = params.technika; // "technika" bude název sloupce v Glide
-      if (data) {
-        renderToolbar(data);
-      }
-    });
-
-    function renderToolbar(data) {
+    function init() {
+      const wrap = document.getElementById('canvas-wrap');
+      canvas.setDimensions({ width: wrap.clientWidth, height: wrap.clientHeight });
+      if(!dataRaw) return;
+      const assets = JSON.parse(decodeURIComponent(dataRaw));
       const tb = document.getElementById('toolbar');
-      tb.innerHTML = '';
-      data.forEach(item => {
-        const url = item.url || Object.values(item)[1];
-        if (!url || url.length < 10) return;
-        
+      assets.forEach(a => {
         const div = document.createElement('div');
         div.className = 'item';
-        div.onclick = () => addItem(url);
-        div.innerHTML = `<img src="${url}"><span>${item.name || ''}</span>`;
+        div.onclick = () => {
+          fabric.Image.fromURL(a.url, (img) => {
+            const scale = 100 / img.width;
+            img.set({ left: 50, top: 50, scaleX: scale, scaleY: scale });
+            canvas.add(img).setActiveObject(img).renderAll();
+          }, { crossOrigin: 'anonymous' });
+        };
+        div.innerHTML = `<img src="${a.url}"><span>${a.name}</span>`;
         tb.appendChild(div);
       });
     }
-
-    function addItem(url) {
-      fabric.Image.fromURL(url, (img) => {
-        const scale = 80 / img.width;
-        img.set({ left: 50, top: 50, scaleX: scale, scaleY: scale, cornerColor: '#bb86fc' });
-        canvas.add(img).setActiveObject(img).renderAll();
-      }, { crossOrigin: 'anonymous' });
-    }
-
+    window.onresize = init; setTimeout(init, 500);
     function del() { canvas.getActiveObjects().forEach(o => canvas.remove(o)); canvas.discardActiveObject().renderAll(); }
-    function sav() { 
-        canvas.discardActiveObject().renderAll();
-        const link = document.createElement('a');
-        link.download = 'plan.png';
-        link.href = canvas.toDataURL({format: 'png', multiplier: 2});
-        link.click();
-    }
-
-    function resize() {
-      const cont = document.getElementById('canvas-cont');
-      canvas.setDimensions({ width: cont.clientWidth, height: cont.clientHeight });
-    }
-    window.onresize = resize;
-    setTimeout(resize, 500);
+    function sav() { canvas.discardActiveObject().renderAll(); const link = document.createElement('a'); link.download = 'plan.png'; link.href = canvas.toDataURL(); link.click(); }
   </script>
 </body>
 </html>
